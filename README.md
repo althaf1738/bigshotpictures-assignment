@@ -224,7 +224,7 @@ Returns counts by tier, by status, degradation rate and reasons, latency percent
 
 - **Status fields** (`tier_used`, `degraded`, `degradation_reason`, `total_latency_ms`, `prompt_version`) are typed columns on the `analyses` table - queryable and indexable.
 - **Audit log** (`pool_attempts`, `token_usage`, `stages_completed`) lives in the JSONB `processing_metadata` column - flexible shape, read whole when investigating a specific row.
-- **API responses are projections** — list endpoints return summary status only, the detail endpoint returns result + status, the `/audit` endpoint returns the full processing trail on demand.
+- **API responses are projections** - list endpoints return summary status only, the detail endpoint returns result + status, the `/audit` endpoint returns the full processing trail on demand.
 
 This keeps the API lean while preserving full debuggability.
 
@@ -255,7 +255,7 @@ Content-Type: application/json
 **Content types** (used for routing and prompt context):
 `auto`, `tagline`, `headline`, `social_post`, `ad_copy`, `creative_brief`, `concept`, `campaign_brief`, `script_excerpt`, `treatment`, `pitch`
 
-**Tier override:** `auto` (default — let the router decide), `fast`, `rich`
+**Tier override:** `auto` (default - let the router decide), `fast`, `rich`
 
 Returns the submission with status `pending` (rich tier) or `complete` (fast tier).
 
@@ -343,7 +343,7 @@ make dev
 
 Open `http://localhost:8000/dashboard`.
 
-The default configuration uses SQLite (`reviews.db` in the project root) and the mock provider — no external dependencies, no API keys required. To use real providers, set `NIM_API_KEY` and/or `ANTHROPIC_API_KEY` in `.env`.
+The default configuration uses SQLite (`reviews.db` in the project root) and the mock provider - no external dependencies, no API keys required. To use real providers, set `NIM_API_KEY` and/or `ANTHROPIC_API_KEY` in `.env`.
 
 ### Docker
 
@@ -376,102 +376,206 @@ Railway provides `DATABASE_URL` automatically when a Postgres service is attache
 
 ---
 
-## Railway deployment
-
-1. Push to GitHub
-2. Create a Railway project from the repo
-3. Add a Railway Postgres service
-4. Configure app environment variables:
-
-```env
-API_KEYS=<long-random-key>
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-NIM_API_KEY=<your-nim-key>
-ANTHROPIC_API_KEY=<your-anthropic-key>
-FAST_POOL=nim:meta/llama-3.3-70b-instruct,anthropic:claude-haiku-4-5
-RICH_POOL=nim:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning,anthropic:claude-opus-4-8
-```
-
-The Dockerfile uses Railway's dynamic `PORT`. After deployment, hit `/health` and `/dashboard` to verify.
-
----
 
 ## Key tradeoffs
 
-**Pool-based routing with provider-prefixed model IDs.** Configuration is a single comma-separated env var per pool. Adding a model is a one-line change. Adding a provider requires one new adapter module. This is the seam that makes evolution cheap.
+### Pool-based provider abstraction
 
-**Append-only analyses with JSONB processing_metadata.** Every reanalysis creates a new row. Same submission can be analyzed multiple times against different prompts or configurations, and the full history is preserved for audit and regression checking. The JSONB column means the audit shape can evolve without migrations.
+A model pool is an ordered list of `(provider, model)` pairs configured via a single env var per tier. Adding a model is a one-line change; adding a provider requires one new adapter module. The alternative - branching on provider type inside the strategy layer - would have scattered provider-specific code throughout the codebase. The cost is one extra layer of indirection, which pays for itself the first time you add a fallback provider.
 
-**Synchronous fast tier, asynchronous rich tier.** Fast tier completes in 1–3 seconds and is delivered in the response. Rich tier returns a submission ID immediately and runs in a `BackgroundTasks`. The dashboard polls for status updates. Background tasks take only the submission ID and refetch from the DB, so migrating to a real queue (Arq, Celery) is mechanical — no business logic changes needed.
+### Cross-provider failover, not cross-model failover
 
-**HTMX polling for async updates.** Polling has a 2s starting interval with backoff to 10s, paused when the tab is hidden. For production scale, Server-Sent Events would eliminate the per-poll DB query; for prototype scale, polling is the simplest pattern that works.
+When a provider call fails (timeout, 5xx, rate limit), the pool moves to the next *provider*, not the next model on the same provider. Same-provider model fallback only helps for quality or prompt failures - for availability failures, the provider infrastructure is shared, so the second model fails the same way. Quality failures are handled separately via corrective-prompt retries on the same provider. This is the design most prototypes get subtly wrong.
 
-**`create_all()` on startup for schema management.** Acceptable for demos and fresh databases. A production deployment would use Alembic migrations. Documented explicitly so it's not mistaken for production-ready.
+### Append-only analyses with JSONB processing metadata
 
-**SQLite locally, Postgres on Railway.** Same SQLAlchemy code path for both. Local dev needs zero external dependencies. The URL normalization step handles Railway's connection string conventions.
+Every reanalysis creates a new row. This gives audit trail, prompt-version diffing, A/B test capability, and reanalysis history essentially for free. Update-in-place would have required a real migration the first time we wanted any of those. Status fields (`tier_used`, `degraded`, `total_latency_ms`) are typed columns for fast filtering; the audit log (`pool_attempts`, `token_usage`) lives in a JSONB column whose shape can evolve without migrations.
+
+### Synchronous fast tier, asynchronous rich tier
+
+The tier decision bundles three concerns: model capability, prompt strategy (single-stage vs two-stage), and execution mode (sync vs async). They're correlated in practice and bundling them avoids exposing three independent toggles to the user. Background tasks for the rich tier take only the submission ID and refetch from the database - making them safe under restarts and migration-ready to a real queue (Arq, Celery) without business logic changes.
+
+### Rule-based routing instead of ML-based
+
+The router uses a priority cascade of explicit rules. Rules are deterministic, testable, debuggable, and explainable; every routing decision logs a human-readable reason. An LLM-based classifier would add a model call before the model call, require labeled training data we don't have, and make routing decisions opaque. Once production data exists, an ML router could swap in behind the same interface.
+
+### HTMX polling for async result delivery
+
+The dashboard polls `/dashboard/{id}/status` with a 2s starting interval, backing off to 10s, paused when the tab is hidden. Server-Sent Events would eliminate per-poll database queries and improve perceived latency, but require a long-lived connection and additional client complexity. At prototype scale, polling overhead is negligible. SSE is the production answer; polling is documented as a deliberate scope choice.
+
+### MockProvider as a first-class adapter
+
+The mock provider implements the same `AnalysisAdapter` interface as NIM and Anthropic. This is what lets the system run end-to-end with zero API keys, what lets the eval suite execute deterministically in CI, and what serves as the final fallback when every real provider fails. Treating mock as a real adapter rather than a special case means it stays in sync with the response schema on every test run.
+
+### Single connection-string DB layer over engine-specific abstractions
+
+The same SQLAlchemy code runs against any DB engine supported by SQLAlchemy, switched via `DATABASE_URL`. Railway provides Postgres in production; SQLite works for local dev with zero setup. The alternative - writing engine-specific code paths - would have doubled the surface area for marginal benefit. The cost is occasionally avoiding Postgres-specific syntax in raw queries; the benefit is a frictionless local-to-deployed migration path and trivial engine swaps.
+
+### Structured logging with correlation IDs over heavy tracing infrastructure
+
+Every request gets a correlation ID that flows through HTTP → background task → strategy → pool → adapter, logged as structured JSON to stdout. The platform's log viewer (Railway's, Render's, etc.) provides the search and filter UI. The alternative - wiring OpenTelemetry to Honeycomb or Datadog from day one - would have added vendor dependency, configuration overhead, and a paid service tier. Correlation IDs are the prototype-grade equivalent and they become trace IDs trivially when OTel is added later.
 
 ---
 
 ## What was intentionally not built
 
-- **Multi-tenancy** (workspaces, users, roles) - out of scope for a single-team internal tool
-- **Real distributed job queue** (Celery, Arq) - BackgroundTasks suffices at this scale; migration path documented above
-- **Webhooks / external notifications** - additive; can slot in at the end of `run_analysis`
-- **Server-Sent Events for status polling** - polling is sufficient for prototype scale
-- **Agentic / multi-step analysis with tool use** - single-pass or two-stage only; agentic flows would be a larger architectural change
-- **Distributed tracing** (OpenTelemetry) - correlation IDs are the prototype equivalent; OTel migration is mostly instrumentation
-- **PII detection and redaction** before sending to LLMs - production hardening, scoped out
-- **Cost enforcement / budget caps** - token usage is recorded per analysis but not gated
-- **Per-content-type prompt variants** - single prompt per tier; per-type variants are a clear future improvement
-- **LLM-as-judge in evals** - current semantic checks are keyword-based, which is brittle but cheap and deterministic
-- **JSON API endpoint for reanalyze** - reanalyze exists as a dashboard route (`POST /dashboard/{id}/reanalyze`) but not yet on `/submissions`. Easy addition if needed
-- **CSRF protection on dashboard forms** - required before public deployment
-- **SSRF hardening on image URL fetching** - required before accepting URLs from untrusted users; currently size-limited only
+### Out of scope for an internal team tool
 
----
+- **Multi-tenancy (workspaces, users, roles)** - no user model, no per-user data isolation. A real product serving multiple teams needs workspace-scoped submissions and RBAC. The repository pattern makes this additive - a nullable `workspace_id` plus a tenant resolver dependency covers most of it.
 
-## Where AI tools helped, and what I verified or changed
+- **Full authentication and identity (OAuth, SSO, sessions)** - single shared API key via header is sufficient for an internal tool with known users. Real auth needs user accounts, password reset, possibly SSO.
 
-I used Claude (via the chat interface) extensively for design discussions and Claude Code for implementation. The breakdown:
+- **Real-time collaboration** - no simultaneous editors, no comments, no approval flows. Turning the tool into a workflow product (comments, approval gates, status transitions) is a separate product.
 
-**Claude (design):**
-- Worked through the routing architecture, fallback chain design, and the tier/stage/model separation as conversation. The "three independent decisions bundled by tier" mental model came out of this discussion.
-- Reviewed early designs and pushed back on weak ones (e.g., I caught a flaw in the same-provider-model fallback design through this back-and-forth, which led to the current cross-provider-only architecture).
-- Helped articulate tradeoffs and the future-work prioritization.
+### Different architecture, not an addition
 
-**Claude Code (implementation):**
-- Scaffolded the FastAPI app structure, Pydantic schemas, SQLAlchemy models, and Docker setup.
-- Implemented the pool/strategy/adapter classes against a clear specification.
-- Built the HTMX dashboard templates and polling logic.
-- Generated initial test fixtures and the pytest runner.
+- **Agentic or multi-step analysis with tool use** - the two-stage rich tier is the limit of orchestration. True agentic flows (search past work, look up competitors, pull from connected sources) need a tool registry and state machine. The provider abstraction would be wrapped, not replaced.
 
-**What I verified or modified manually:**
-- The routing rules and keyword set — iterated based on test inputs to reduce false positives.
-- The decision to **not** retry across same-provider models for availability failures — Claude Code initially generated a chain that did this; I refactored it because the rationale is fundamentally different (model fallback helps for quality, provider fallback helps for availability).
-- The audit log honesty issue — discovered through real log inspection that `pool_member_success` was firing on HTTP success even when validation later failed. Fixed to record outcomes at the validation layer.
-- The content_type routing wiring — UI was sending tab selections that the router was ignoring; threaded the field through schema → DB → router.
-- Prompt design for the extract and evaluate stages — manually tuned for output structure and groundedness.
+- **Streaming responses (SSE or WebSockets)** - rich tier runs to completion before storing. Streaming requires partial-result writes, a streaming endpoint, and a `stream_analyze()` provider method. Significant change for production UX value.
 
-The pattern was: use AI tools for surface-area-heavy work (scaffolding, boilerplate, repetitive code) and manual review/redesign for decisions that have architectural consequences. Every meaningful design decision in the README was made consciously, not accepted from generated code.
+- **True async job queue (Celery, Arq, SQS)** - `BackgroundTasks` runs in-process: jobs don't survive restarts, can't be processed by separate workers. Migration is mechanical because tasks already take IDs and refetch, but it requires running Redis/RabbitMQ and worker processes.
+
+### Production hardening - required before exposing to untrusted users
+
+- **SSRF hardening on image URL fetching** - currently size-limited but doesn't block private IPs, localhost, or cloud metadata endpoints. Critical vulnerability for a public service.
+
+- **CSRF protection on dashboard form routes** - POST submissions accepted without CSRF tokens. Mandatory for any deployment serving authenticated browser sessions.
+
+- **PII detection and redaction before sending to LLM providers** - briefs may contain customer names, unannounced launches, competitive intelligence. Production needs a pre-processing pipeline that detects and redacts or warns. Provider zero-retention agreements would also be part of the answer.
+
+- **Distributed rate limiting** - `slowapi` uses per-key in-memory counters that don't coordinate across instances. Horizontal scaling needs Redis-backed rate limiting.
+
+- **Cost enforcement and budget caps** - token usage is recorded per analysis but not gated. A bulk attacker could rack up real costs. Production needs per-key budget caps, automatic tier downgrade as budgets exhaust, and spend alerting.
+
+- **Data retention and right-to-delete** - submissions and analyses live indefinitely. GDPR and similar regulations require explicit retention policies and a deletion mechanism. Append-only analyses make deletion more involved (cascade or anonymize), but it's a known pattern.
+
+
+### Deferred because low ROI now, clearly additive later
+
+- **Webhooks and external integrations** - no Slack/Linear/Asana notifications. Architecture supports them trivially via a fire-and-forget step at the end of `run_analysis`, but no team currently consumes the events.
+
+- **Per-content-type prompt variants** - single generic rich-tier prompt. Script excerpts benefit from different evaluation than campaign briefs. Prompt system is already file-based, so type-specific variants are additive and would noticeably improve quality.
+
+- **LLM-as-judge in the eval suite** - current semantic checks are keyword-based: brittle but cheap and deterministic. A judge model scoring against rubrics would catch quality regressions keyword matching misses, at the cost of another model call and another source of nondeterminism.
+
+- **Distributed tracing (OpenTelemetry)** - correlation IDs in structured logs are the prototype-grade equivalent. Migration is mostly instrumentation - correlation IDs become trace IDs, log calls become span events.
+
 
 ---
 
 ## Future work
 
-If I had more time, in priority order:
+### Model quality and analysis depth
 
-1. **LLM-as-judge eval layer** — current semantic checks are keyword-based and brittle. A judge model scoring analyses against rubrics would catch quality regressions that keyword matching misses.
+- **LLM-as-judge eval layer** - highest-leverage improvement for output quality over time. Judge model scores analyses against rubrics (groundedness, specificity, actionability) on every prompt change in CI; regressions block deploys. Without this, prompt iteration is blind.
 
-2. **Per-content-type prompt variants** — a script excerpt benefits from different evaluation than a tagline. The prompt system is already file-based; adding type-specific variants is additive.
+- **Per-content-type prompt variants** - type-specific prompts emphasizing relevant evaluation dimensions (pacing/character for scripts, audience-goal alignment for campaigns, memorability for taglines). Prompt loader is already file-based; this is additive.
 
-3. **Server-Sent Events for status updates** — replace polling with a single push-based connection. Eliminates per-poll DB load and improves perceived latency.
+- **Two-stage tuning and sub-task parallelism** - Stage 1 (extract) is observational and could run on a cheaper model; Stage 2 (evaluate) needs the strong model. Independent Stage 2 sub-tasks can run in parallel via `asyncio.gather`, recovering most of the latency cost.
 
-4. **Real distributed job queue** — migrate from `BackgroundTasks` to Arq or Celery for persistence across restarts and horizontal scaling. Background tasks already take IDs and refetch, so the migration is mechanical.
+- **RAG over past submissions and brand guidelines** - when a team uses the tool repeatedly, analyses should learn the brand voice. RAG against past analyses and brand documents enables real "does this fit our brand?" evaluation. Per-workspace isolation required.
 
-5. **A/B testing framework for prompts** — analyses are already tagged with `prompt_version`. Adding traffic-splitting in the prompt loader enables structured prompt experimentation.
+- **Confidence intervals and explicit uncertainty** - each output field carries a confidence score, surfaced in the UI. Low-confidence claims get visual differentiation. Implemented via self-consistency or the judge layer.
 
-6. **Per-key budget caps and rate tiers** — token usage is recorded; adding budget enforcement is a query + a check in the router.
+### Reliability and observability at scale
 
-7. **SSRF hardening + CSRF protection** — required before exposing image URL fetching or the dashboard to untrusted users.
+- **True async job queue (Arq, Celery, SQS)** - persistent queue surviving restarts, multiple worker processes scaling independently, per-job retry policies with dead-letter handling. Migration is mechanical.
 
-8. **OpenTelemetry tracing** — correlation IDs become trace IDs, sent to a service like Honeycomb or Grafana Tempo. Mostly instrumentation, not refactor.
+- **Circuit breaker on provider calls** - after N failures in M seconds, skip the provider for a cooldown period. Avoids the latency cost of attempting calls during outages. Hooks into the existing pool layer.
+
+- **OpenTelemetry distributed tracing** - correlation IDs become trace IDs with span-level latency breakdowns. Cross-service propagation when more services are added. Sent to Honeycomb, Datadog, or Grafana Tempo.
+
+- **Server-Sent Events for status updates** - replace HTMX polling with push-based connections. Eliminates per-poll DB queries; users see results the moment they're ready.
+
+- **Formal SLOs and alerting** - defined p95 latency targets per tier, error rate thresholds, provider availability minimums. Violations surface to PagerDuty or Slack. Status page built from the metrics endpoint.
+
+- **Automatic recovery sweep for stuck jobs** - on startup, scan for submissions in `processing` status older than a threshold and re-queue them.
+
+### Scale and performance
+
+- **Connection pool tuning and read replicas** - tune pool sizing based on observed concurrency. Send reads to a replica; keep the primary for writes.
+
+- **Response caching for identical submissions** - hash submission content, cache analyses by hash. Useful for replay scenarios. Slot into the repository layer behind the same interface.
+
+- **Provider-side prompt caching** - both Anthropic and NIM support prompt caching natively. Long system prompts can be cached, reducing per-call cost when the same prompt is used repeatedly.
+
+- **Batch analysis endpoint** - for bulk evaluation (re-analyzing a backlog against a new prompt), an endpoint that accepts arrays and queues each. Required for eval scale and for "re-evaluate everything" workflows.
+
+- **Multi-region deployment** - app instances in multiple regions, geographic routing, replicated Postgres. Provider endpoints are global so they need no changes.
+
+### Multimodal expansion
+
+- **Video support** - frame sampling + vision analysis per frame, or audio extraction → transcript → text analysis. Product question of "what does video analysis mean" needs answering first.
+
+- **Audio support** - Whisper-based transcription then standard text analysis, plus tone/sentiment on the audio itself. Real for podcast scripts, voiceover, radio ads.
+
+- **Asset caching in object storage** - fetched images persisted to S3, keyed by URL hash with expiry policies. Saves bandwidth and supports replay.
+
+- **Authenticated asset URLs** - currently only public URLs work. Production needs signed S3, OAuth-fetched assets, and credentialed bucket access.
+
+- **Pre-LLM safety filtering on images** - cheap classifier (Rekognition, SafeSearch) before paying for full vision analysis. Catches NSFW or otherwise problematic content cheaply.
+
+### Product features
+
+- **Webhooks and external notifications** - Slack/Linear/Asana on analysis complete. Per-workspace webhook configuration. Retry on delivery failure.
+
+- **Comments and approval flows** - make analyses actionable: reviewers comment, request changes, mark approved/rejected, route to stakeholders. Transforms the tool from "analysis" to "workflow."
+
+- **Submission versioning and side-by-side comparison** - track revisions of the same concept. Show v1 and v2 analyses side by side. Highlight improvements and regressions.
+
+- **Brand guidelines integration** - uploaded brand documents (voice guides, visual standards). Analyses include explicit checks against brand rules. RAG layer over uploaded docs plus brand-aware prompts.
+
+- **Export to PDF, Notion, Google Docs** - polished output formats for sharing analyses outside the tool. Goes with comments/approvals - analyses become workflow artifacts.
+
+- **Multi-tenant workspaces** - per-workspace submissions, members, roles, settings, prompts. Foundational for a real SaaS product.
+
+### Cost control and operations
+
+- **Per-key or per-workspace budget caps with alerts** - quotas, soft warnings, hard cutoffs. Automatic tier downgrade as budget nears exhaustion. Spend dashboards per workspace.
+
+- **Provider arbitrage based on cost and quality** - route to the cheapest provider meeting a quality bar, measured by the judge layer. Provider mix shifts as pricing evolves.
+
+- **Tenant-level data residency** - regional Postgres deployments and region-restricted provider routing for enterprise customers requiring specific regions.
+
+- **SOC 2 and security compliance** - audit logging, encryption at rest, penetration testing. Required for enterprise sales.
+
+### Security and compliance
+
+- **SSRF and CSRF hardening** - required before public deployment. URL allowlist enforcement, private-IP blocking, redirect inspection; token-based form protection on state-changing routes.
+
+- **PII detection and redaction** - pre-LLM filtering for customer names, emails, internal product codes, unannounced launches. Either redact and proceed, or warn and require confirmation.
+
+- **Zero-retention agreements with LLM providers** - both Anthropic and OpenAI offer agreements exempting your data from training and reducing retention windows. Required for enterprise.
+
+- **Audit logs and right-to-delete** - track who accessed what when. Implement cascade deletion or anonymization for user data deletion requests. Standard GDPR/CCPA.
+
+
+
+## Where AI tools helped, and what I verified or changed
+
+I designed the architecture myself and used Claude as a thinking partner throughout. The decisions about what to build, what to leave out, and which tradeoffs to make were mine. Claude helped me pressure-test them.
+
+**What I did myself:**
+
+- Designed the overall architecture, including the three-layer fallback structure (retry, pool, strategy) and the separation between routing, strategy, and provider concerns
+- Wrote the database models, schemas, and repository layer
+- Made the product decisions: what content types to support, how the "Deep analysis" toggle should behave, how the dashboard should present degraded results, what to include in the audit metadata vs. the API response
+- Chose the tradeoffs: synchronous fast vs. asynchronous rich tier, cross-provider failover instead of cross-model, append-only analyses with JSONB metadata, polling over SSE for this scope
+- Wrote the routing logic from scratch, including the priority cascade, the keyword set, and the threshold tuning
+- Wrote the eval fixtures and the runner
+- Wrote the structured logging setup, the correlation ID middleware, and the events that get logged at each layer
+- Wrote the prompts for the fast tier, extract stage, and evaluate stage
+
+**Where Claude chat helped:**
+
+Used it for back-and-forth design discussions: talking through tradeoffs before committing to them, stress-testing decisions, and catching weak designs early. A concrete example: I initially had a fallback chain that retried across models on the same provider for availability failures. Working through *why* that pattern would help vs. *when* it actually applies clarified that same-provider model fallback only helps for quality failures, not availability failures. That conversation directly shaped the cross-provider-only design that's in the code now. Similar conversations shaped the routing rules, the storage split between typed columns and JSONB, and the decision to make the UI toggle an upgrade-only override rather than a gate.
+
+**Where Claude Code helped:**
+
+Used it for surface-area work: the HTMX dashboard templates and polling logic, the test scaffolding and pytest setup, repetitive boilerplate (provider adapter shells, schema definitions), and Docker/Makefile setup. Also used it for debugging. When a bug appeared in the logs (like the `pool_member_success` log firing on HTTP success even when validation failed downstream), I'd describe the symptom and have Claude Code propose the fix, then review and adjust before applying.
+
+**How I verified the AI-generated code:**
+
+Every file Claude Code produced, I went through line by line. Where the generated code matched my design, I kept it. Where it didn't, and this happened often enough to matter, I rewrote it. The fallback chain was rewritten after Claude Code initially generated a version that mixed availability and quality concerns. The audit log recording was rewritten when I found it was logging "success" at the HTTP layer instead of the validation layer. The router was simplified after the first version had too many overlapping rules. The pattern was: I used AI tools to move fast on the parts that are mechanical, but never accept generated code on architectural decisions without reviewing the *why* behind it.
+
+The result is a codebase where every meaningful design decision was made consciously, and where I can explain *why* each piece is the shape it is, including the parts AI tools helped write.
