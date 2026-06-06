@@ -332,26 +332,55 @@ Fixtures are JSON files in `evals/fixtures/`. Adding a new test case is dropping
 
 ## Setup
 
+
 ### Local development
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload
+```
+
+Or with make:
 
 ```bash
 make install
 cp .env.example .env
-# (optional) edit .env to add API keys for real providers; defaults to mock
 make dev
+```
+
+Open `http://localhost:8000/dashboard`. 
+
+The default configuration uses 
+SQLite and the mock provider - no external dependencies or API keys 
+required. To use real providers, set `NIM_API_KEY` and/or 
+`ANTHROPIC_API_KEY` in `.env`. You can add your own models or providers in .env file.
+
+### Docker (recommended)
+
+```bash
+docker compose up
 ```
 
 Open `http://localhost:8000/dashboard`.
 
-The default configuration uses SQLite (`reviews.db` in the project root) and the mock provider - no external dependencies, no API keys required. To use real providers, set `NIM_API_KEY` and/or `ANTHROPIC_API_KEY` in `.env`.
-
-### Docker
+For tests and evals:
 
 ```bash
-make docker-up        # run the API
-make docker-test      # run unit/integration tests
-make docker-evals     # run eval suite
+docker compose --profile test run --rm test
+docker compose --profile test run --rm evals
 ```
+
+Or use the make wrappers if you prefer:
+
+```bash
+make docker-up        # equivalent to: docker compose up
+make docker-test      # runs unit/integration tests in Docker
+make docker-evals     # runs the eval suite in Docker
+```
+
 
 ### Environment variables
 
