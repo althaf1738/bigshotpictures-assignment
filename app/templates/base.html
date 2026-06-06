@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Creative Review{% endblock %} — BigShot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+    .htmx-request.htmx-indicator { opacity: 1; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .score-bar { transition: width 0.6s ease-out; }
+  </style>
+</head>
+<body class="h-full font-sans text-gray-900">
+
+<!-- Nav -->
+<nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <a href="/dashboard" class="flex items-center gap-2 font-semibold text-gray-900 hover:text-indigo-600 transition-colors">
+      <svg class="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.347a3.15 3.15 0 01-2.122.879H9.75a3.15 3.15 0 01-2.122-.879l-.347-.347z"/>
+      </svg>
+      BigShot Reviews
+    </a>
+    <div class="flex items-center gap-3">
+      <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-900 {% if request.url.path == '/dashboard' %}font-medium text-gray-900{% endif %}">Reviews</a>
+      <a href="/submit" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        New Submission
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Flash messages -->
+{% if flash %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+  <div class="rounded-lg px-4 py-3 text-sm font-medium
+    {% if flash.type == 'error' %}bg-red-50 text-red-800 border border-red-200
+    {% elif flash.type == 'success' %}bg-green-50 text-green-800 border border-green-200
+    {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+    {{ flash.message }}
+  </div>
+</div>
+{% endif %}
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+  lucide.createIcons();
+  document.body.addEventListener('htmx:afterSwap', () => lucide.createIcons());
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

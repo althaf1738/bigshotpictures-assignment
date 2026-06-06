@@ -1,0 +1,18 @@
+{
+  "id": "tc-010",
+  "description": "B2B SaaS brief with launch keyword",
+  "submission": {
+    "title": "SaaS Platform Launch",
+    "brief_text": "We are preparing to launch our new B2B analytics platform to enterprise clients. The launch campaign should position us as the most trusted data intelligence partner for Fortune 500 companies. Key differentiators: real-time processing, enterprise-grade security, 99.99% uptime SLA.",
+    "asset_urls": [],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.6,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

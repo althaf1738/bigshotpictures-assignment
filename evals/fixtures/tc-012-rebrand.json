@@ -1,0 +1,18 @@
+{
+  "id": "tc-012",
+  "description": "Rebrand keyword triggers rich tier",
+  "submission": {
+    "title": "Company Rebrand Identity",
+    "brief_text": "Full rebrand for a 20-year-old accounting firm moving into fintech advisory services. Need new logo, color palette, and brand guidelines that retain trust and authority while feeling modern.",
+    "asset_urls": [],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.6,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

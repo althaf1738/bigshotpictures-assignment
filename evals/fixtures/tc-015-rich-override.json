@@ -1,0 +1,18 @@
+{
+  "id": "tc-015",
+  "description": "Explicit rich override wins over minimal brief",
+  "submission": {
+    "title": "Forced Rich Minimal",
+    "brief_text": "One line.",
+    "asset_urls": [],
+    "tier": "rich"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

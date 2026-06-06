@@ -1,0 +1,17 @@
+{
+  "id": "tc-001",
+  "description": "Simple product ad brief — fast tier",
+  "submission": {
+    "title": "Summer Sale Product Ad",
+    "brief_text": "A vibrant product advertisement for our summer sale. The ad should showcase our new line of sunglasses with a fun, energetic vibe targeting millennials.",
+    "asset_urls": [],
+    "tier": "fast"
+  },
+  "expected": {
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations", "target_audience", "tone"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

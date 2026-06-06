@@ -1,0 +1,17 @@
+{
+  "id": "tc-011",
+  "description": "Nonprofit appeal — fast tier",
+  "submission": {
+    "title": "Charity Appeal Email",
+    "brief_text": "Year-end donation appeal email for a children's education nonprofit. Emotional storytelling, show impact, clear CTA to donate. Audience: existing donors who gave last year.",
+    "asset_urls": [],
+    "tier": "fast"
+  },
+  "expected": {
+    "min_confidence": 0.6,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

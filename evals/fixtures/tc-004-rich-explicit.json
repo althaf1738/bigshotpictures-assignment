@@ -1,0 +1,18 @@
+{
+  "id": "tc-004",
+  "description": "Explicit rich tier request",
+  "submission": {
+    "title": "Annual Report Cover",
+    "brief_text": "Design a striking cover for our 2024 annual report. Should convey trust, innovation, and growth. Primary color is navy blue with gold accents. Target audience is investors and board members.",
+    "asset_urls": [],
+    "tier": "rich"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.6,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations", "target_audience", "tone"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

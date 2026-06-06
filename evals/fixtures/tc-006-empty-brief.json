@@ -1,0 +1,17 @@
+{
+  "id": "tc-006",
+  "description": "Empty brief — edge case",
+  "submission": {
+    "title": "Untitled Submission",
+    "brief_text": null,
+    "asset_urls": [],
+    "tier": "fast"
+  },
+  "expected": {
+    "min_confidence": 0.1,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

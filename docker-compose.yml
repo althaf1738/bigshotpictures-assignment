@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./reviews.db:/app/reviews.db
+    restart: unless-stopped
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      API_KEYS: testkey
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+    command: ["pytest", "tests", "-q"]
+    profiles:
+      - test
+
+  evals:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      EVAL_PROVIDER: mock
+    command: ["pytest", "evals/test_evals.py", "-q"]
+    profiles:
+      - test
+
+  db:
+    image: postgres:16-alpine
+    profiles:
+      - postgres
+    environment:
+      POSTGRES_DB: reviews
+      POSTGRES_USER: reviews
+      POSTGRES_PASSWORD: reviews
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:

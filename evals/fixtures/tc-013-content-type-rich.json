@@ -1,0 +1,19 @@
+{
+  "id": "tc-013",
+  "description": "Rich content type routes to rich even with short text",
+  "submission": {
+    "title": "Short Treatment",
+    "brief_text": "Opening scene for a launch film.",
+    "asset_urls": [],
+    "tier": "auto",
+    "content_type": "treatment"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

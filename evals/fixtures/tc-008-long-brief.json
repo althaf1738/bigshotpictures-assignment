@@ -1,0 +1,18 @@
+{
+  "id": "tc-008",
+  "description": "Long brief over 2000 chars auto-routes to rich",
+  "submission": {
+    "title": "Comprehensive Product Launch",
+    "brief_text": "This is an extensive creative brief for a major product launch. Our company, established in 2015, has been a leader in sustainable home goods. We are now launching our most innovative product yet: the EcoSmart Kitchen Collection. This collection consists of 12 pieces including pots, pans, utensils, and storage containers, all made from 100% recycled materials with a proprietary non-toxic coating. The target consumer is health-conscious, environmentally aware households with an annual income of $75,000+. Primary demographics: adults aged 28-45, predominantly female primary household shoppers, residing in urban and suburban markets. Secondary audience: gift buyers for wedding registries and housewarming gifts. The key messages we need to communicate are: first, every product is made from materials that would otherwise end up in landfills; second, our coating technology is PFOA and PTFE free, tested and certified by independent labs; third, the design aesthetic blends seamlessly with modern kitchen styles. The tone should be warm, trustworthy, and aspirational without being preachy or alarmist about environmental issues. We want to inspire rather than guilt. Visual direction: clean, bright photography showing real families cooking together, with occasional lifestyle shots showing the products in beautifully styled kitchens. Color palette: warm whites, sage greens, and terracotta. The campaign will run across digital (social, display, search), print (cooking magazines, lifestyle publications), and in-store. We need assets in multiple formats. The launch date is October 15th and we have a budget for 3 rounds of revisions.",
+    "asset_urls": [],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.7,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations", "target_audience", "tone"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

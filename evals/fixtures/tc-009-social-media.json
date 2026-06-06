@@ -1,0 +1,17 @@
+{
+  "id": "tc-009",
+  "description": "Social media content brief — fast tier",
+  "submission": {
+    "title": "Instagram Reel",
+    "brief_text": "15-second Instagram reel for a fitness app. Show someone completing a morning workout, then using the app to log it. Energetic music, Gen Z vibe, bright colors.",
+    "asset_urls": [],
+    "tier": "fast"
+  },
+  "expected": {
+    "min_confidence": 0.6,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

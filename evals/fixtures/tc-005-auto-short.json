@@ -1,0 +1,18 @@
+{
+  "id": "tc-005",
+  "description": "Auto tier with short non-keyword brief — should route fast",
+  "submission": {
+    "title": "Coffee Shop Flyer",
+    "brief_text": "Weekend special flyer for a cozy coffee shop. Show our signature drinks and pastries.",
+    "asset_urls": [],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "fast",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

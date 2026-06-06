@@ -1,0 +1,18 @@
+{
+  "id": "tc-014",
+  "description": "Explicit fast override wins over rich-looking brief",
+  "submission": {
+    "title": "Forced Fast Campaign",
+    "brief_text": "Strategic brand campaign launch with target audience, messaging hierarchy, media plan, and creative direction.",
+    "asset_urls": [],
+    "tier": "fast"
+  },
+  "expected": {
+    "expected_tier": "fast",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 10000
+  }
+}

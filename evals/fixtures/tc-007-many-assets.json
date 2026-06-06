@@ -1,0 +1,18 @@
+{
+  "id": "tc-007",
+  "description": "Many asset URLs triggers rich tier auto-routing",
+  "submission": {
+    "title": "Lookbook Shoot",
+    "brief_text": "Fashion lookbook for autumn collection.",
+    "asset_urls": ["https://example.com/img1.jpg", "https://example.com/img2.jpg", "https://example.com/img3.jpg", "https://example.com/img4.jpg"],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

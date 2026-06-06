@@ -1,0 +1,18 @@
+{
+  "id": "tc-003",
+  "description": "Strategic keyword in brief — auto routes to rich",
+  "submission": {
+    "title": "Brand Refresh Campaign",
+    "brief_text": "We are launching a strategic brand campaign to reposition our company as a premium sustainable lifestyle brand. The campaign should connect with eco-conscious consumers aged 30-45 who value authenticity and quality over price.",
+    "asset_urls": [],
+    "tier": "auto"
+  },
+  "expected": {
+    "expected_tier": "rich",
+    "min_confidence": 0.5,
+    "required_fields": ["summary", "scores", "strengths", "improvements", "recommendations"],
+    "score_range": [1, 10],
+    "num_scores": 6,
+    "max_duration_ms": 30000
+  }
+}

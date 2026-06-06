@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}{{ sub.title }}{% endblock %}
+
+{% block content %}
+{% set is_live = sub.status in ['pending', 'processing'] %}
+
+<!-- Poll while pending/processing -->
+{% if is_live %}
+<div id="status-poller"
+  hx-get="/dashboard/{{ sub.id }}/status"
+  hx-trigger="every 2s"
+  hx-target="#analysis-section"
+  hx-swap="outerHTML">
+</div>
+{% endif %}
+
+<!-- Header -->
+<div class="flex items-start justify-between gap-4 mb-6">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 mb-2">
+      <a href="/dashboard" class="text-sm text-gray-400 hover:text-gray-600">Reviews</a>
+      <span class="text-gray-300">/</span>
+      <span class="text-sm text-gray-600 truncate">{{ sub.title }}</span>
+    </div>
+    <h1 class="text-2xl font-bold text-gray-900">{{ sub.title }}</h1>
+    <p class="text-sm text-gray-500 mt-1">Submitted {{ sub.created_at.strftime('%B %d, %Y at %H:%M') if sub.created_at else '' }}</p>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    {% set status_cfg = {
+      'done':       ('bg-green-50 text-green-700 border-green-200',  '✓ Done'),
+      'processing': ('bg-yellow-50 text-yellow-700 border-yellow-200', '⟳ Processing'),
+      'pending':    ('bg-blue-50 text-blue-700 border-blue-200',     '· Pending'),
+      'failed':     ('bg-red-50 text-red-700 border-red-200',        '✕ Failed'),
+    } %}
+    {% set scfg = status_cfg.get(sub.status, status_cfg['pending']) %}
+    <span class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full border {{ scfg[0] }}
+      {% if sub.status == 'processing' %}animate-pulse{% endif %}">
+      {% if sub.status == 'processing' %}
+      <span class="w-2 h-2 rounded-full bg-yellow-500 spin inline-block"></span>
+      {% endif %}
+      {{ scfg[1] }}
+    </span>
+  </div>
+</div>
+
+<!-- Action buttons -->
+<div class="flex gap-2 mb-6">
+  <form method="post" action="/dashboard/{{ sub.id }}/reanalyze">
+    <button type="submit" class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Reanalyze
+    </button>
+  </form>
+  {% if sub.tier_requested == 'fast' or (sub.analyses and sub.analyses[0].tier_used == 'fast') %}
+  <form method="post" action="/dashboard/{{ sub.id }}/reanalyze?tier=rich">
+    <button type="submit" class="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
+      Force rich tier
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Submitted content (collapsible if long) -->
+{% if sub.brief_text %}
+<details {% if sub.brief_text|length <= 300 %}open{% endif %} class="group bg-white border border-gray-200 rounded-xl mb-5 overflow-hidden">
+  <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none list-none">
+    <span class="text-sm font-medium text-gray-700">Submitted Content</span>
+    <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </summary>
+  <div class="px-5 pb-4 border-t border-gray-100 space-y-3">
+    <p class="text-sm text-gray-700 whitespace-pre-wrap mt-3">{{ sub.brief_text }}</p>
+    {% if sub.asset_urls %}
+    <div>
+      <p class="text-xs font-medium text-gray-500 mb-2">Asset URLs</p>
+      <div class="flex flex-wrap gap-2">
+        {% for url in sub.asset_urls %}
+        <a href="{{ url }}" target="_blank" class="text-xs text-indigo-600 hover:underline truncate max-w-xs">{{ url }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+
+<!-- Analysis section -->
+<div id="analysis-section">
+  {% if sub.status == 'done' and sub.analyses %}
+    {% set analysis = sub.analyses[0] %}
+    {% set result = analysis.result %}
+    {% include "partials/analysis_result.html" %}
+  {% elif sub.status in ['pending', 'processing'] %}
+    {% include "partials/analysis_pending.html" %}
+  {% elif sub.status == 'failed' %}
+    {% include "partials/analysis_failed.html" %}
+  {% endif %}
+</div>
+
+{% if sub.analyses %}
+<!-- Metadata footer -->
+{% set analysis = sub.analyses[0] %}
+<details class="group mt-5 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+  <summary class="flex items-center justify-between px-5 py-3 cursor-pointer select-none list-none">
+    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Analysis Metadata</span>
+    <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </summary>
+  <div class="px-5 pb-4 border-t border-gray-200 mt-0">
+    <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-xs">
+      <div><dt class="text-gray-400">Tier used</dt><dd class="font-medium text-gray-700 capitalize">{{ analysis.tier_used }}</dd></div>
+      <div><dt class="text-gray-400">Model</dt><dd class="font-medium text-gray-700">{{ analysis.model_used }}</dd></div>
+      <div><dt class="text-gray-400">Prompt version</dt><dd class="font-medium text-gray-700">{{ analysis.prompt_version }}</dd></div>
+      <div><dt class="text-gray-400">Latency</dt><dd class="font-medium text-gray-700">{{ analysis.total_latency_ms }}ms</dd></div>
+      <div><dt class="text-gray-400">Cost estimate</dt><dd class="font-medium text-gray-700">${{ "%.5f"|format(analysis.cost_estimate_usd) }}</dd></div>
+      <div><dt class="text-gray-400">Analysis ID</dt><dd class="font-mono text-gray-500 text-xs">{{ analysis.id[:16] }}…</dd></div>
+    </dl>
+    {% if sub.analyses|length > 1 %}
+    <div class="mt-3 pt-3 border-t border-gray-200">
+      <p class="text-xs text-gray-400 font-medium mb-1">Previous analyses</p>
+      <div class="space-y-1">
+        {% for prev in sub.analyses[1:] %}
+        <div class="text-xs text-gray-500 flex gap-3">
+          <span>{{ prev.created_at.strftime('%b %d %H:%M') }}</span>
+          <span class="capitalize">{{ prev.tier_used }}</span>
+          <span>{{ prev.model_used }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if is_live %}
+<script>
+  // Stop polling once status changes away from pending/processing
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.target.id === 'analysis-section') {
+      const poller = document.getElementById('status-poller');
+      if (poller && !evt.target.querySelector('[data-still-live]')) {
+        poller.remove();
+      }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

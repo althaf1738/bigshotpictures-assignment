@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}New Submission{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">New Submission</h1>
+    <p class="text-sm text-gray-500 mt-1">Submit a creative brief, script, or logline for AI analysis.</p>
+  </div>
+
+  <form method="post" action="/submit" class="space-y-6 bg-white rounded-xl border border-gray-200 p-6">
+
+    <!-- Title -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">Title <span class="text-red-500">*</span></label>
+      <input type="text" name="title" required maxlength="255" placeholder="e.g. Summer Sale Campaign"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"/>
+    </div>
+
+    <!-- Content -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">Content <span class="text-red-500">*</span></label>
+      <div class="relative">
+        <textarea name="brief_text" id="brief-textarea" rows="6" placeholder="Describe the creative work — target audience, key message, tone, deliverables…"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+          oninput="updateCounter(this)"></textarea>
+        <span id="char-counter" class="absolute bottom-2 right-3 text-xs text-gray-400">0</span>
+      </div>
+    </div>
+
+    <!-- Content type -->
+    <div>
+      <label for="content_type" class="block text-sm font-medium text-gray-700 mb-1.5">What is this for?</label>
+      <select name="content_type" id="content_type"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        <option value="auto" selected>Auto / Not sure</option>
+        <option value="tagline">Tagline</option>
+        <option value="headline">Headline</option>
+        <option value="social_post">Social Post</option>
+        <option value="ad_copy">Ad Copy</option>
+        <option value="creative_brief">Creative Brief</option>
+        <option value="concept">Concept</option>
+        <option value="campaign_brief">Campaign Brief</option>
+        <option value="script_excerpt">Script Excerpt</option>
+        <option value="treatment">Treatment</option>
+        <option value="pitch">Pitch</option>
+      </select>
+    </div>
+
+    <!-- Deep Analysis toggle -->
+    <div class="flex items-start gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+      <div class="flex items-center h-5 mt-0.5">
+        <input id="deep_analysis" name="deep_analysis" type="checkbox" value="on"
+          class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+          onchange="updateTierHint(this)"/>
+      </div>
+      <div>
+        <label for="deep_analysis" class="text-sm font-medium text-gray-800 cursor-pointer">Deep Analysis</label>
+        <p id="tier-hint" class="text-xs text-gray-500 mt-0.5">
+          Auto — the system will choose the analysis depth based on your content.
+        </p>
+      </div>
+    </div>
+
+    <!-- Optional fields -->
+    <div class="space-y-4">
+      <button type="button" onclick="toggleOptional()" id="optional-toggle"
+        class="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+        <svg id="optional-icon" class="w-4 h-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+        Optional details
+      </button>
+      <div id="optional-fields" class="hidden space-y-4 border-l-2 border-gray-100 pl-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Target Audience</label>
+            <input type="text" name="target_audience" placeholder="e.g. Millennials 25–35"
+              class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Campaign Goal</label>
+            <input type="text" name="campaign_goal" placeholder="e.g. Brand awareness"
+              class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Asset URLs <span class="font-normal text-gray-400">(one per line — triggers deep analysis)</span></label>
+          <textarea name="asset_urls_text" rows="2" placeholder="https://example.com/image.jpg"
+            class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+      <a href="/dashboard" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+      <button type="submit"
+        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded-lg transition-colors">
+        <span class="htmx-indicator">
+          <svg class="w-4 h-4 spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </span>
+        Submit for analysis
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateCounter(el) {
+  document.getElementById('char-counter').textContent = el.value.length;
+}
+
+function toggleOptional() {
+  const el = document.getElementById('optional-fields');
+  const icon = document.getElementById('optional-icon');
+  el.classList.toggle('hidden');
+  icon.style.transform = el.classList.contains('hidden') ? '' : 'rotate(90deg)';
+}
+
+function updateTierHint(checkbox) {
+  const hint = document.getElementById('tier-hint');
+  if (checkbox.checked) {
+    hint.textContent = 'Deep — two-stage analysis using the strongest available model.';
+    hint.className = 'text-xs text-indigo-600 mt-0.5 font-medium';
+  } else {
+    hint.textContent = 'Auto — the system will choose the analysis depth based on your content.';
+    hint.className = 'text-xs text-gray-500 mt-0.5';
+  }
+}
+</script>
+{% endblock %}
