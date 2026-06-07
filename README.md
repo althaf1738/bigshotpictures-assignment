@@ -2,9 +2,10 @@
 
 AI-powered creative review service that accepts creative submissions - campaign briefs, taglines, ad concepts, social posts, scripts, treatments, and visual assets - and returns structured analyses to help creative teams triage and review work.
 
-**Live demo:** [FILL IN RAILWAY URL]
-**Walkthrough video:** [FILL IN VIDEO URL]
-**Repository:** [FILL IN GITHUB URL]
+Railway live link: [Live Deployed app](https://bigshotpictures-assignment-production.up.railway.app/)
+
+**Walkthrough video Recorded in Tella:**   [Walkthrough-video](https://www.tella.tv/video/building-an-ai-powered-creative-review-platform-hol1)
+
 
 ---
 
@@ -13,8 +14,8 @@ AI-powered creative review service that accepts creative submissions - campaign 
 Submit a creative for analysis against the live deployment:
 
 ```bash
-curl -X POST [FILL IN RAILWAY URL]/submissions \
-  -H "X-API-Key: [FILL IN]" \
+curl -X POST https://bigshotpictures-assignment-production.up.railway.app/submissions \
+  -H "X-API-Key: devkey1" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Spring Activewear Launch",
@@ -25,7 +26,7 @@ curl -X POST [FILL IN RAILWAY URL]/submissions \
   }'
 ```
 
-The submission auto-routes to the **rich tier** (because of `content_type: campaign_brief`), runs a two-stage extract→evaluate analysis asynchronously, and returns a submission ID. Poll `GET /submissions/{id}` for results, or open `[FILL IN RAILWAY URL]/dashboard` to watch it complete in the UI.
+The submission auto-routes to the **rich tier** (because of `content_type: campaign_brief`), runs a two-stage extract→evaluate analysis asynchronously, and returns a submission ID. Poll `GET /submissions/{id}` for results, or open [https://bigshotpictures-assignment-production.up.railway.app/dashboard](https://bigshotpictures-assignment-production.up.railway.app/dashboard/) to watch it complete in the UI.
 
 ---
 
@@ -191,7 +192,8 @@ Logs are intentionally **not** stored in the application database - they're tran
 While logs are transient, each analysis records its full processing history permanently in `analyses.processing_metadata` (JSONB):
 
 ```bash
-curl [FILL IN RAILWAY URL]/submissions/{id}/audit
+curl https://bigshotpictures-assignment-production.up.railway.app/submissions/{id}/audit \
+  -H "X-API-Key: devkey1"
 ```
 
 Returns:
@@ -215,7 +217,7 @@ Returns:
 ### Aggregate metrics
 
 ```bash
-curl [FILL IN RAILWAY URL]/metrics
+curl https://bigshotpictures-assignment-production.up.railway.app/metrics
 ```
 
 Returns counts by tier, by status, degradation rate and reasons, latency percentiles per tier, and per-provider call/error rates.
@@ -288,7 +290,7 @@ GET /metrics
 
 ## Dashboard
 
-Open `[FILL IN RAILWAY URL]/dashboard` to use the browser UI:
+Open [https://bigshotpictures-assignment-production.up.railway.app/dashboard](https://bigshotpictures-assignment-production.up.railway.app/dashboard) to use the browser UI:
 
 - Create submissions via form
 - View the review queue with status, tier, and degraded badges
