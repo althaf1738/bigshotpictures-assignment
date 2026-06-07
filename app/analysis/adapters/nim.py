@@ -10,6 +10,18 @@ from app.analysis.exceptions import (
     ProviderUnavailableError, RateLimitError,
 )
 from app.analysis.pool import CallPayload
+from app.schemas.analysis import AnalysisResult
+
+
+def _analysis_response_format() -> dict:
+    schema = AnalysisResult.model_json_schema()
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "CreativeAnalysisResult",
+            "schema": schema,
+        },
+    }
 
 
 class NimAdapter:
@@ -25,20 +37,55 @@ class NimAdapter:
 
     async def call(self, payload: CallPayload) -> str:
         messages = self._build_messages(payload)
+        uses_schema = payload.stage in ("single", "stage_2")
+        kwargs = {
+            "model": self.model_id,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 4096 if uses_schema else 2048,
+        }
+        if uses_schema:
+            kwargs["response_format"] = _analysis_response_format()
+
         try:
-            completion = await self._client.chat.completions.create(
-                model=self.model_id,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=2048,
-            )
-            return completion.choices[0].message.content or ""
+            completion = await self._client.chat.completions.create(**kwargs)
+            text = self._message_text(completion)
+            if text or not uses_schema:
+                return text
+
+            fallback_kwargs = dict(kwargs)
+            fallback_kwargs.pop("response_format", None)
+            fallback = await self._client.chat.completions.create(**fallback_kwargs)
+            text = self._message_text(fallback)
+            if text:
+                return text
+
+            raise ProviderUnavailableError("NIM returned empty message content")
         except APITimeoutError as e:
             raise ProviderUnavailableError(str(e)) from e
         except APIConnectionError as e:
             raise ProviderUnavailableError(str(e)) from e
         except APIStatusError as e:
             raise self._translate_status(e) from e
+
+    @staticmethod
+    def _message_text(completion) -> str:
+        if not completion.choices:
+            return ""
+
+        message = completion.choices[0].message
+        content = getattr(message, "content", "") or ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    parts.append(part.get("text", ""))
+                else:
+                    parts.append(getattr(part, "text", ""))
+            return "".join(parts)
+        return str(content)
 
     def _build_messages(self, payload: CallPayload) -> list[dict]:
         user_content: list[dict] = []

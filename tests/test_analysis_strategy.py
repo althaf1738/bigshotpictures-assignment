@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from app.analysis.exceptions import PoolExhaustedError
 from app.analysis.pool import CallPayload, ModelPool
-from app.analysis.strategy import AnalysisStrategy, build_pool
+from app.analysis.strategy import AnalysisStrategy, build_pool, _extract_json
 
 
 _VALID_JSON = json.dumps({
@@ -64,6 +64,22 @@ def test_build_pool_rejects_malformed_entries():
 def test_build_pool_rejects_unknown_provider_prefix():
     with pytest.raises(ValueError, match="Unknown provider prefix 'missing'"):
         build_pool("missing:model", _settings(), "fast")
+
+
+def test_extract_json_recovers_last_object_from_wrapped_model_output():
+    text = f'thinking {{"scratch": true}}\n```json\n{_VALID_JSON}\n```'
+    assert _extract_json(text)["summary"] == "Great ad"
+
+
+def test_extract_json_does_not_return_nested_object_from_truncated_result():
+    text = '''{
+      "summary": "A valid-looking start",
+      "scores": [
+        {"dimension": "concept", "score": 4, "rationale": "Good"},
+        {"dimension": "execution", "score": 5, "rationale": "Also good"}
+    '''
+    with pytest.raises(json.JSONDecodeError, match="No complete AnalysisResult|Expecting"):
+        _extract_json(text)
 
 
 # --- Fast tier ---

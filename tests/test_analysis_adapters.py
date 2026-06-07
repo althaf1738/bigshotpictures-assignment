@@ -6,7 +6,8 @@ Uses mock httpx responses — no real API calls are made.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.analysis.adapters import load_adapters
 from app.analysis.adapters.anthropic import AnthropicAdapter
@@ -116,6 +117,55 @@ class TestNimAdapterErrorTranslation:
         err = APIConnectionError(request=httpx.Request("GET", "http://localhost"))
         with patch.object(adapter._client.chat.completions, "create", side_effect=err):
             with pytest.raises(ProviderUnavailableError):
+                await adapter.call(_payload())
+
+    async def test_final_analysis_calls_request_json_schema(self):
+        adapter = self._adapter()
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"summary":"ok"}'))]
+        )
+        with patch.object(adapter._client.chat.completions, "create", new=AsyncMock(return_value=response)) as create:
+            await adapter.call(_payload())
+
+        kwargs = create.call_args.kwargs
+        assert kwargs["response_format"]["type"] == "json_schema"
+        assert kwargs["response_format"]["json_schema"]["name"] == "CreativeAnalysisResult"
+
+    async def test_stage_1_extraction_does_not_request_analysis_schema(self):
+        adapter = self._adapter()
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="extracted context"))]
+        )
+        with patch.object(adapter._client.chat.completions, "create", new=AsyncMock(return_value=response)) as create:
+            await adapter.call(CallPayload(system="sys", user_text="brief", stage="stage_1"))
+
+        assert "response_format" not in create.call_args.kwargs
+
+    async def test_empty_schema_response_retries_without_response_format(self):
+        adapter = self._adapter()
+        empty_response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
+        )
+        fallback_response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"summary":"ok"}'))]
+        )
+        create = AsyncMock(side_effect=[empty_response, fallback_response])
+        with patch.object(adapter._client.chat.completions, "create", new=create):
+            assert await adapter.call(_payload()) == '{"summary":"ok"}'
+
+        first_kwargs = create.call_args_list[0].kwargs
+        second_kwargs = create.call_args_list[1].kwargs
+        assert "response_format" in first_kwargs
+        assert "response_format" not in second_kwargs
+
+    async def test_empty_schema_and_fallback_response_raises_provider_unavailable(self):
+        adapter = self._adapter()
+        empty_response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
+        )
+        create = AsyncMock(side_effect=[empty_response, empty_response])
+        with patch.object(adapter._client.chat.completions, "create", new=create):
+            with pytest.raises(ProviderUnavailableError, match="empty message content"):
                 await adapter.call(_payload())
 
 

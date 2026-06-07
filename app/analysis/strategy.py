@@ -37,6 +37,17 @@ _MOCK_RESULT = AnalysisResult(
     model_used="mock",
 )
 
+_ANALYSIS_RESULT_KEYS = {
+    "summary",
+    "scores",
+    "strengths",
+    "improvements",
+    "target_audience",
+    "tone",
+    "recommendations",
+    "confidence",
+}
+
 
 @dataclass
 class StrategyResult:
@@ -68,10 +79,24 @@ def _load_prompt(name: str) -> str:
 
 
 def _extract_json(text: str) -> dict:
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        return json.loads(match.group())
-    return json.loads(text)
+    decoder = json.JSONDecoder()
+
+    stripped = text.strip()
+    if stripped.startswith("{"):
+        parsed, _ = decoder.raw_decode(stripped)
+        if not isinstance(parsed, dict):
+            raise json.JSONDecodeError("Expected a JSON object", text, 0)
+        return parsed
+
+    for match in re.finditer(r"\{", text):
+        try:
+            parsed, _ = decoder.raw_decode(text[match.start():])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and _ANALYSIS_RESULT_KEYS.issubset(parsed):
+            return parsed
+
+    raise json.JSONDecodeError("No complete AnalysisResult JSON object found", text, 0)
 
 
 def _validate_schema(text: str) -> None:
