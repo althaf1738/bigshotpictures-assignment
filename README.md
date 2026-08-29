@@ -1,4 +1,4 @@
-# Creative Review Analysis Service
+# Concept Copilot  - Creative Review Analysis Service
 
 AI-powered creative review service that accepts creative submissions - campaign briefs, taglines, ad concepts, social posts, scripts, treatments, and visual assets - and returns structured analyses to help creative teams triage and review work.
 
